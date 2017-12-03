@@ -24,7 +24,7 @@ public class TileMovement extends Thread implements Constants {
 	}
 	@Override
 	public void run() {
-			lgc.scr.fr.removeKeyListener(lgc);
+			lgc.scr.newGameBtn.removeKeyListener(lgc);
 			allMovementsDone = false;
 
 			do {
@@ -40,7 +40,7 @@ public class TileMovement extends Thread implements Constants {
 						}
 					else{
 						ttm.movementDone = true;
-						if (ttm.removeTile == true)
+						if (ttm.removeTile)
 							scr.mp.remove(ttm.tile);
 					}
 				}
@@ -66,6 +66,6 @@ public class TileMovement extends Thread implements Constants {
 			
 			arrToMove.clear();
 
-			lgc.scr.fr.addKeyListener(lgc);
+			lgc.scr.newGameBtn.addKeyListener(lgc);
 		}
 }

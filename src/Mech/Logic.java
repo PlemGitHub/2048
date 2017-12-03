@@ -9,6 +9,8 @@ import java.awt.event.KeyListener;
 import java.util.ArrayList;
 import java.util.Random;
 
+import javax.swing.JOptionPane;
+
 import Visual.*;
 import Tiles.*;
 import Threads.*;
@@ -16,18 +18,28 @@ import Threads.*;
 public class Logic implements Constants, KeyListener, KeyDictionary, ActionListener{
 	
 	public Screen scr;
-	public Tile[][] arrTile = new Tile[tCells][tCells];
-	public boolean turnDone;
-	private ArrayList<TileToMove> arrToMove = new ArrayList<>();
+	public HighScoreWriter hsw;
+	private GameThread gameThread;
 	private TileGeneration tGen;
 	private TileMovement tMove;
+	public Tile[][] arrTile = new Tile[tCells][tCells];
+	private ArrayList<TileToMove> arrToMove = new ArrayList<>();
+	public boolean turnDone;
 	public int gameScore;
-	private GameThread gameThread;
-	
+	private int undoGameScore;
+	private int undoDX = 0, undoDY = 0;
+	public boolean undoSameSideMovement;
+	public int newTileI, newTileJ;
+	private int undoNewTileI, undoNewTileJ;
+	private int undoNewTileScore;
+	private Tile[][] undoArrTile = new Tile[tCells][tCells];
+	private int[][] undoArrTileScores = new int[tCells][tCells];
+	private int undoQuantity;
 	
 	public Logic(Screen scr) {
 		this.scr = scr;
 		generateArrPoints();
+		hsw = new HighScoreWriter(this);
 		gameThread = new GameThread(this);
 		gameThread.start();
 	}
@@ -39,7 +51,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 		for (int i = 0; i < tCells; i++)
 			for (int j = 0; j < tCells; j++){
 				arrPoint[i][j] = new Point();
-				arrPoint[i][j].setLocation(tSize+(tSize+tGap)*i, tSize+(tSize+tGap)*j);				
+				arrPoint[i][j].setLocation(tSize+(tSize+tGap)*i, tSize+(tSize+tGap)*j);		
 			}
 	}
 
@@ -48,6 +60,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 	 */
 	public void createNewTile() {
 		boolean creationDone = false;
+		scr.surrendBtn.setEnabled(true);
 		
 		if (checkEmptySpace())
 			do {
@@ -56,6 +69,9 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 				int j = rnd.nextInt(tCells);
 				if (arrTile[i][j] == null){
 					arrTile[i][j] = new Tile();
+					undoNewTileI = i;
+					undoNewTileJ = j;
+					undoNewTileScore = arrTile[i][j].getScore();
 					tGen = new TileGeneration(this, arrTile[i][j], arrPoint[i][j]);
 					tGen.start();
 					do {
@@ -65,6 +81,37 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 					creationDone = true;
 				}
 			} while (!creationDone);
+		
+		if (!checkEmptySpace() && noMoreMoves()){
+			JOptionPane.showMessageDialog(scr.fr, "Нет больше ходов! Конец игры.");
+			hsw.addHighScoresToFile(gameScore);
+		}
+	}
+	
+	public void createNewTile(int newTileI, int newTileJ) {
+		scr.surrendBtn.setEnabled(true);
+		int i = undoNewTileI;
+		int j = undoNewTileJ;
+			arrTile[i][j] = new Tile();
+			arrTile[i][j].setScore(undoNewTileScore);
+			tGen = new TileGeneration(this, arrTile[i][j], arrPoint[i][j]);
+			tGen.start();
+			do {
+				Thread.yield();
+			} while (!tGen.creationDone);
+			undoSameSideMovement = false;
+	}
+
+	private boolean noMoreMoves() {
+		for (int i = 0; i < tCells; i++)
+			for (int j = 0; j < tCells-1; j++)
+				if (arrTile[i][j].getScore() == arrTile[i][j+1].getScore())
+						return false;
+		for (int i = 0; i < tCells-1; i++)
+			for (int j = 0; j < tCells; j++)
+				if (arrTile[i][j].getScore() == arrTile[i+1][j].getScore())
+						return false;
+	return true;
 	}
 
 	/**
@@ -90,48 +137,92 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 			System.exit(0);
 		char c = KeyDictionary.keyTranslation(e.getKeyChar());
 		switch (c) {
-		case 'w': goUp(); break;
-		case 'a': goLeft(); break;
-		case 's': goDown(); break;
-		case 'd': goRight(); break;
+		case 'w': if (checkSideMove(0, -1))	goUp(0, -1); break;
+		case 'a': if (checkSideMove(-1, 0))	goLeft(-1, 0); break;
+		case 's': if (checkSideMove(0, 1))	goDown(0, 1); break;
+		case 'd': if (checkSideMove(1, 0))	goRight(1, 0); break;
 		}
 	}
 
-	private void goUp() {
+	/**
+	 * Checks if specific side movement is available
+	 * @param dI
+	 * @param dJ
+	 * @return
+	 */
+	private boolean checkSideMove(int dI, int dJ) {
+		for (int i = 0; i < tCells; i++)
+			for (int j = 0; j < tCells; j++){
+				int nextI = i+dI;
+				int nextJ = j+dJ;
+				if (nextI < 0 || nextI > tCells-1 || nextJ < 0 || nextJ > tCells-1)
+					continue;
+				Tile baseTile = arrTile[i][j];
+				
+				// if cell is empty - there is no Tile. Looking for more.
+				if (baseTile == null)
+					continue;
+				
+				// if next Tile is empty - u can move
+				if (arrTile[nextI][nextJ] == null)
+					return true;
+				
+				// if next Tile isn't empty and scores are equal
+				if (arrTile[nextI][nextJ].getScore() == baseTile.getScore())
+					return true;
+			}	
+		return false;
+	}
+
+	private void goUp(int dX, int dY) {
+		doSnapshot(dX, dY);
 		for (int j = 0; j < tCells; j++)
 			for (int i = 0; i < tCells; i++)
-				go(i, j, 0, -1);
+				go(i, j, dX, dY);
 
 		tMove = new TileMovement(scr, this, 0, -1, arrToMove);
 		tMove.start();
 	}
 
-	private void goLeft() {
+	private void goLeft(int dX, int dY) {
+		doSnapshot(dX, dY);
 		for (int i = 0; i < tCells; i++)
 			for (int j = 0; j < tCells; j++)
-				go(i, j, -1, 0);
+				go(i, j, dX, dY);
 
 		tMove = new TileMovement(scr, this, -1, 0, arrToMove);
 		tMove.start();
 	}
 
-	private void goDown() {
+	private void goDown(int dX, int dY) {
+		doSnapshot(dX, dY);
 		for (int j = tCells-1; j >=0; j--)
 			for (int i = 0; i < tCells; i++) 
-				go(i, j, 0, 1);
+				go(i, j, dX, dY);
 		tMove = new TileMovement(scr, this, 0, 1, arrToMove);
 		tMove.start();
 	}
 
-	private void goRight() {
+	private void goRight(int dX, int dY) {
+		doSnapshot(dX, dY);
 		for (int i = tCells-1; i >=0; i--)
 			for (int j = 0; j < tCells; j++) 
-				go(i, j, 1, 0);
+				go(i, j, dX, dY);
 		tMove = new TileMovement(scr, this, 1, 0, arrToMove);
 		tMove.start();
 	}
 	
+	/**
+	 * Main movement calculation method
+	 * @param i - Tile's indexes
+	 * @param j - Tile's indexes
+	 * @param dX - defines direction (0, 1)
+	 * @param dY - defines direction (0, 1)
+	 */
 	private void go(int i, int j, int dX, int dY){
+		if (undoQuantity == 0)
+			scr.undoBtn.setEnabled(true);
+		
 		if (arrTile[i][j] != null){
 			TileToMove tileToMove = new TileToMove();
 			tileToMove.tile = arrTile[i][j];
@@ -147,13 +238,23 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 			
 			if (!tileToMove.selfCollision){				// if no selfCollision - move Tile in arrTile
 				arrToMove.add(tileToMove);
-				if (!tileToMove.removeTile)
+				if (!tileToMove.removeTile){
 					arrTile[tileToMove.destI][tileToMove.destJ] = arrTile[i][j];
+				}
 				arrTile[i][j] = null;
 			}
 		}	
 	}
 	
+	/**
+	 * Universal method to check Tiles collision in specific direction
+	 * @param tileToMove
+	 * @param i - Tile's indexes
+	 * @param j - Tile's indexes
+	 * @param dI - defines direction (0, 1)
+	 * @param dJ - defines direction (0, 1)
+	 * @return tileToMove object with upgraded "selfCollision", "removeTile" and "destPoint" fields
+	 */
 	private TileToMove checkCollision(TileToMove tileToMove, int i, int j, int dI, int dJ){
 		int oldI = i;
 		int oldJ = j;
@@ -165,14 +266,15 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 				j = j+dJ;
 				j = (j < 0)|(j > tCells-1)? j-dJ:j;
 				
-				if (arrTile[i][j] != null){
-					if (arrTile[i][j] != tileToMove.tile){	//// if collision with another Tile
-						if (arrTile[i][j].getScore() != tileToMove.tile.getScore()){	// if different scores
+				Tile tileToCheck = arrTile[i][j];
+				if (tileToCheck != null){
+					if (tileToCheck != tileToMove.tile){	//// if collision with another Tile
+						if (tileToCheck.getScore() != tileToMove.tile.getScore()){	// if different scores
 							i-=dI;	// return previous
 							j-=dJ;	// indexes values
 							if (i == oldI && j == oldJ)
-								tileToMove.selfCollision = true;;
-						}else{															// if scores equal
+								tileToMove.selfCollision = true;
+						}else{														// if scores equal
 							tileToMove.removeTile = true;
 						}
 					}else{									//// if "self-collision"
@@ -182,35 +284,144 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 				}
 			}
 
-		tileToMove.destI = i;		// need to modify
-		tileToMove.destJ = j;		// arrTile array
+		tileToMove.destI = i;		// need to modify arrTile array
+		tileToMove.destJ = j;		// in go() method when scores 
 		tileToMove.destPoint = arrPoint[i][j];
 		return tileToMove;
 	}
+	
+	/**
+	 * Saves game field, game score, movement side and NewTile generation point to do "undo" action
+	 * @param dX - defines side move direction (0, 1)
+	 * @param dY - defines side move direction (0, 1)
+	 */
+	private void doSnapshot(int dX, int dY) {
+		undoQuantity = undoQuantity > 0? undoQuantity-1:undoQuantity;
+		// game field
+		for (int i = 0; i < tCells; i++)
+			for (int j = 0; j < tCells; j++){
+				undoArrTile[i][j] = null;
+				if (arrTile[i][j] != null){
+					undoArrTile[i][j] = arrTile[i][j];
+					undoArrTileScores[i][j] = arrTile[i][j].getScore();
+				}
+			}
+		
+		// game score
+		undoGameScore = gameScore;
+		
+		// movement side and NewTile generation point
+		if (undoDX == dX && undoDY == dY){	// if side move after Undo action is the same
+			undoSameSideMovement = true;
+			newTileI = undoNewTileI;
+			newTileJ = undoNewTileJ;
+		}
+		undoDX = dX;
+		undoDY = dY;
+	}
+
 
 	@Override
 	public void actionPerformed(ActionEvent e) {
+		/**
+		 * NEW GAME
+		 */
 		if (e.getSource().equals(scr.newGameBtn)){
-			gameThread.interrupt();
 			arrToMove.clear();
 			setGameScore(0);
+			undoDX = 0;
+			undoDY = 0;
+			undoGameScore = 0;
 			
-			for (Component t : scr.mp.getComponents())
-				if (t.getName() != null && t.getName().equals("Tile"))
-					scr.mp.remove(t);
-
-			for (int i = 0; i < tCells; i++)
-				for (int j = 0; j < tCells; j++)
-					arrTile[i][j] = null;
+			clearTilesFromField();
+			scr.upBtn.setEnabled(true);
+			scr.leftBtn.setEnabled(true);
+			scr.downBtn.setEnabled(true);
+			scr.rightBtn.setEnabled(true);
+			scr.undoBtn.setEnabled(false);
 			
-			gameThread = new GameThread(this);
-			gameThread.start();
+			turnDone = true;
+			scr.mp.validate();
 			scr.mp.repaint();
 		}
+		
+		/**
+		 * SURREND
+		 */
+		if (e.getSource().equals(scr.surrendBtn)){
+			int d = JOptionPane.showConfirmDialog(scr.fr, "Вы уверены, что хотите сдаться?", "Подтверждение сдачи", JOptionPane.YES_NO_OPTION);
+			if (d == JOptionPane.OK_OPTION){
+				JOptionPane.showMessageDialog(scr.fr, "Вы сдались! Конец игры.");
+				hsw.addHighScoresToFile(gameScore);
+			}
+		}
+		
+		/**
+		 * UNDO
+		 */
+		if (e.getSource().equals(scr.undoBtn)){
+			scr.undoBtn.setEnabled(false);
+			undoQuantity = 2;
+			setGameScore(undoGameScore);
+			clearTilesFromField();
+			for (int i = 0; i < tCells; i++)
+				for (int j = 0; j < tCells; j++){
+					arrTile[i][j] = undoArrTile[i][j];
+					if (arrTile[i][j] != null){
+						scr.mp.add(arrTile[i][j]);
+						arrTile[i][j].setLocation(arrPoint[i][j].x, arrPoint[i][j].y);
+						arrTile[i][j].setScore(undoArrTileScores[i][j]);
+					}
+				}
+			scr.mp.validate();
+			scr.mp.repaint();
+		}
+		
+		if (e.getSource().equals(scr.upBtn)){
+			if (scr.upBtn.isEnabled())
+				goUp(0, -1);
+//			generate14Tiles();
+		}
+		if (e.getSource().equals(scr.leftBtn)){
+			if (scr.leftBtn.isEnabled())
+			goLeft(-1, 0);
+		}
+		if (e.getSource().equals(scr.downBtn)){
+			if (scr.downBtn.isEnabled())
+			goDown(0, 1);
+		}
+		if (e.getSource().equals(scr.rightBtn)){
+			if (scr.rightBtn.isEnabled())
+			goRight(1, 0);
+		}
+	}
+	
+	private void clearTilesFromField() {
+		for (Component t : scr.mp.getComponents())
+			if (t.getName() != null && t.getName().equals("Tile"))
+				scr.mp.remove(t);
+		clearArrTile(arrTile);
+	}
+	
+	public void clearArrTile(Tile[][] arrTile){
+		for (int i = 0; i < tCells; i++)
+			for (int j = 0; j < tCells; j++)
+				arrTile[i][j] = null;
 	}
 
-	public void setGameScore(int i) {
-		gameScore = i;
+	public void generate14Tiles(){
+		for (int i = 0; i < 14; i++) {
+			createNewTile();
+		}
+		for (int i = 0; i < tCells; i++)
+			for (int j = 0; j < tCells; j++) {
+				if (arrTile[i][j] != null)
+					arrTile[i][j].setScore(i*j*3+2*i);
+			}
+	}
+
+	public void setGameScore(int newScore) {
+		gameScore = newScore;
 		scr.scoreLbl.setText(Integer.toString(gameScore));
 	}
 }

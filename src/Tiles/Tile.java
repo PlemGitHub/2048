@@ -23,6 +23,7 @@ public class Tile extends JPanel implements Constants{
 		scoreLabel.setBounds(0, 0, tSize, tSize);
 		scoreLabel.setHorizontalAlignment(JLabel.CENTER);
 		scoreLabel.setVerticalAlignment(JLabel.CENTER);
+		scoreLabel.setFont(fontTile);
 		
 	}
 	
@@ -62,7 +63,7 @@ public class Tile extends JPanel implements Constants{
 	public void setScore(int newScore){
 		score = newScore;
 		scoreLabel.setText(Integer.toString(newScore));
-		scoreLabel.repaint();
+//		scoreLabel.repaint();
 		int log2 = (int)(Math.log(score)/Math.log(2));	// logarithm on base 2
 		int blue = (int) log2*40/(5+log2)*8;			// hand-made formula to quick change color at start, and slower further
 		doColor(255, blue, 0);

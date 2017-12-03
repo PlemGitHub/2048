@@ -14,7 +14,10 @@ public class GameThread extends Thread implements Constants{
 		lgc.setGameScore(0);
 		do{
 			lgc.turnDone = false;
-			lgc.createNewTile();
+			if (lgc.undoSameSideMovement)
+				lgc.createNewTile(lgc.newTileI, lgc.newTileJ);
+			else
+				lgc.createNewTile();
 			
 				do
 					Thread.yield();
