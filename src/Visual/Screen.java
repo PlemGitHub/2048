@@ -2,6 +2,8 @@ package Visual;
 
 import java.awt.Color;
 import java.awt.Frame;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -19,6 +21,8 @@ public class Screen implements Constants{
 	public JButton upBtn, leftBtn, downBtn, rightBtn;
 	public JButton okHSBtn;
 	public JButton undoBtn;
+	public JButton logBackUp;
+	public JButton clearHSBtn;
 	public JLabel scoreLbl;
 	private JLabel helpLbl;
 	public JFrame fr;
@@ -34,7 +38,7 @@ public class Screen implements Constants{
 		fr.setContentPane(mp);
 		fr.setExtendedState(Frame.MAXIMIZED_BOTH);
 		fr.setVisible(true);
-		fr.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		fr.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		
 		newGameBtn = new JButton("New Game");
 		mp.add(newGameBtn);
@@ -45,6 +49,7 @@ public class Screen implements Constants{
 		mp.add(surrendBtn);
 		surrendBtn.setFont(fontScore);
 		surrendBtn.setFocusable(false);
+		surrendBtn.setEnabled(false);
 		
 		undoBtn = new JButton("Undo");
 		mp.add(undoBtn);
@@ -52,14 +57,24 @@ public class Screen implements Constants{
 		undoBtn.setFocusable(false);
 		undoBtn.setEnabled(false);
 		
+		logBackUp = new JButton("Save log");
+		mp.add(logBackUp);
+		logBackUp.setFont(fontScore);
+		logBackUp.setFocusable(false);
+		logBackUp.setEnabled(false);
+		
 		upBtn = new JButton("W");
 		upBtn.setFocusable(false);
+		upBtn.setEnabled(false);
 		leftBtn = new JButton("A");
 		leftBtn.setFocusable(false);
+		leftBtn.setEnabled(false);
 		downBtn = new JButton("S");
 		downBtn.setFocusable(false);
+		downBtn.setEnabled(false);
 		rightBtn = new JButton("D");
 		rightBtn.setFocusable(false);
+		rightBtn.setEnabled(false);
 		upBtn.setFont(fontWASD);
 		leftBtn.setFont(fontWASD);
 		downBtn.setFont(fontWASD);
@@ -96,6 +111,7 @@ public class Screen implements Constants{
 		newGameBtn.addActionListener(lgc);
 		surrendBtn.addActionListener(lgc);
 		undoBtn.addActionListener(lgc);
+		logBackUp.addActionListener(lgc);
 		newGameBtn.addKeyListener(lgc);
 		upBtn.addActionListener(lgc);
 		leftBtn.addActionListener(lgc);
@@ -110,6 +126,7 @@ public class Screen implements Constants{
 			leftBtn.setBounds(arrPoint[3][0].x+helpDX, arrPoint[3][2].y+wasdDXY, wasdSize, wasdSize);
 			downBtn.setBounds(arrPoint[3][0].x+helpDX+wasdDXY, arrPoint[3][2].y+wasdDXY, wasdSize, wasdSize);
 			rightBtn.setBounds(arrPoint[3][0].x+helpDX+wasdDXY*2, arrPoint[3][2].y+wasdDXY, wasdSize, wasdSize);
+		logBackUp.setBounds(leftBtn.getX(), leftBtn.getY()+leftBtn.getHeight()+tGap, wasdSize*3+tGap*2, 50);
 			
 		int highScoresNamesX = helpLbl.getX()+helpLbl.getWidth()+tGap*2;
 		int highScoresValuesX = highScoresNamesX + tSize*2 + tGap;
@@ -118,6 +135,7 @@ public class Screen implements Constants{
 			highScoreNames[i].setHorizontalAlignment(JTextField.RIGHT);
 			highScoreNames[i].setBounds(highScoresNamesX, arrPoint[0][0].x+25*i, tSize*2, 20);
 			highScoreNames[i].setFocusable(false);
+			highScoreNames[i].addKeyListener(lgc.hsw);
 			mp.add(highScoreNames[i]);
 			
 			highScoreValues[i] = new JLabel();
@@ -136,7 +154,28 @@ public class Screen implements Constants{
 		okHSBtn.addActionListener(lgc.hsw);
 		mp.add(okHSBtn);
 		
+		clearHSBtn = new JButton("Clear high scores");
+		clearHSBtn.setHorizontalAlignment(JButton.CENTER);
+		clearHSBtn.setVerticalAlignment(JButton.CENTER);
+		clearHSBtn.setFocusable(false);
+		clearHSBtn.setBounds(highScoresNamesX, highScoreValues[0].getY()-25, tSize*3+tGap, 20);
+		clearHSBtn.addActionListener(lgc.hsw);
+		mp.add(clearHSBtn);
+		
+		fr.addWindowListener(new WindowListener() {
+			@Override
+			public void windowClosing(WindowEvent e) {
+				lgc.doOnClose();
+			}
+			public void windowOpened(WindowEvent e) {}
+			public void windowClosed(WindowEvent e) {}
+			public void windowIconified(WindowEvent e) {}
+			public void windowDeiconified(WindowEvent e) {}
+			public void windowActivated(WindowEvent e) {}
+			public void windowDeactivated(WindowEvent e) {}
+		});
 		lgc.hsw.displayHSatStart();
+		mp.repaint();
 	}
 	
 	public static void main(String[] args) {

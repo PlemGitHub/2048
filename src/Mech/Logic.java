@@ -6,11 +6,13 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 
 import javax.swing.JOptionPane;
 
+import Logger.Logger;
 import Visual.*;
 import Tiles.*;
 import Threads.*;
@@ -22,6 +24,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 	private GameThread gameThread;
 	private TileGeneration tGen;
 	private TileMovement tMove;
+	public Logger logger;
 	public Tile[][] arrTile = new Tile[tCells][tCells];
 	private ArrayList<TileToMove> arrToMove = new ArrayList<>();
 	public boolean turnDone;
@@ -29,11 +32,14 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 	private int undoGameScore;
 	private int undoDX = 0, undoDY = 0;
 	public boolean undoSameSideMovement;
-	public int newTileI, newTileJ;
 	private int undoNewTileI, undoNewTileJ;
 	private int undoNewTileScore;
 	private Tile[][] undoArrTile = new Tile[tCells][tCells];
 	private int[][] undoArrTileScores = new int[tCells][tCells];
+	/**
+	 * undoQuantity decreases by 1 each turn from 2 (after Undo button click) to 0. <br>
+	 * If it comes to 0 - button enables again.
+	 */
 	private int undoQuantity;
 	
 	public Logic(Screen scr) {
@@ -41,7 +47,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 		generateArrPoints();
 		hsw = new HighScoreWriter(this);
 		gameThread = new GameThread(this);
-		gameThread.start();
+		logger = new Logger(this);
 	}
 	
 	/**
@@ -79,6 +85,8 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 					} while (!tGen.creationDone);
 					
 					creationDone = true;
+					logger.writeNewTile(i, j, arrTile[i][j].getScore());
+					logger.writeTiles();
 				}
 			} while (!creationDone);
 		
@@ -88,7 +96,12 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 		}
 	}
 	
-	public void createNewTile(int newTileI, int newTileJ) {
+	/**
+	 * Method creates new Tile on the same place if direction equals one before Undo btn pressed
+	 * @param newTileI - saved index
+	 * @param newTileJ - saved index
+	 */
+	public void createNewTileAtTheSamePlace() {
 		scr.surrendBtn.setEnabled(true);
 		int i = undoNewTileI;
 		int j = undoNewTileJ;
@@ -100,6 +113,8 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 				Thread.yield();
 			} while (!tGen.creationDone);
 			undoSameSideMovement = false;
+			logger.writeNewTile(i, j, arrTile[i][j].getScore());
+			logger.writeTiles();
 	}
 
 	private boolean noMoreMoves() {
@@ -130,17 +145,50 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 	}
 
 	@Override
-	public void keyReleased(KeyEvent e) {}
-	public void keyPressed(KeyEvent arg0) {}
-	public void keyTyped(KeyEvent e) {
-		if (e.getKeyChar()==27)
-			System.exit(0);
-		char c = KeyDictionary.keyTranslation(e.getKeyChar());
+	public void keyReleased(KeyEvent e) {
+		int code = e.getKeyCode();
+		char c = ' ';
+		switch (code) {
+			case KeyEvent.VK_UP: c = 'w'; break;
+			case KeyEvent.VK_LEFT: c = 'a'; break;
+			case KeyEvent.VK_DOWN: c = 's'; break;
+			case KeyEvent.VK_RIGHT: c = 'd'; break;
+		}
+		logger.writeKey(c);
 		switch (c) {
-		case 'w': if (checkSideMove(0, -1))	goUp(0, -1); break;
-		case 'a': if (checkSideMove(-1, 0))	goLeft(-1, 0); break;
-		case 's': if (checkSideMove(0, 1))	goDown(0, 1); break;
-		case 'd': if (checkSideMove(1, 0))	goRight(1, 0); break;
+			case 'w': if (scr.upBtn.isEnabled())
+						if (checkSideMove(0, -1))	goUp(0, -1);
+						else logger.writeNoMoveAfterKeyPressed(c); break;
+			case 'a': if (scr.upBtn.isEnabled())
+						if (checkSideMove(-1, 0))	goLeft(-1, 0);
+						else logger.writeNoMoveAfterKeyPressed(c); break;
+			case 's': if (scr.upBtn.isEnabled())
+						if (checkSideMove(0, 1))	goDown(0, 1);
+						else logger.writeNoMoveAfterKeyPressed(c); break;
+			case 'd': if (scr.upBtn.isEnabled())
+						if (checkSideMove(1, 0))	goRight(1, 0);
+						else logger.writeNoMoveAfterKeyPressed(c); break;
+		}
+	}
+	public void keyPressed(KeyEvent e) {}
+	public void keyTyped(KeyEvent e) {
+		if (e.getKeyChar() == 27)
+			doOnClose();
+		char c = KeyDictionary.keyTranslation(e.getKeyChar());
+		logger.writeKey(c);		
+		switch (c) {
+			case 'w': if (scr.upBtn.isEnabled())
+						if (checkSideMove(0, -1))	goUp(0, -1);
+						else logger.writeNoMoveAfterKeyPressed(c); break;
+			case 'a': if (scr.upBtn.isEnabled())
+						if (checkSideMove(-1, 0))	goLeft(-1, 0);
+						else logger.writeNoMoveAfterKeyPressed(c); break;
+			case 's': if (scr.upBtn.isEnabled())
+						if (checkSideMove(0, 1))	goDown(0, 1);
+						else logger.writeNoMoveAfterKeyPressed(c); break;
+			case 'd': if (scr.upBtn.isEnabled())
+						if (checkSideMove(1, 0))	goRight(1, 0);
+						else logger.writeNoMoveAfterKeyPressed(c); break;
 		}
 	}
 
@@ -151,6 +199,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 	 * @return
 	 */
 	private boolean checkSideMove(int dI, int dJ) {
+		
 		for (int i = 0; i < tCells; i++)
 			for (int j = 0; j < tCells; j++){
 				int nextI = i+dI;
@@ -170,7 +219,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 				// if next Tile isn't empty and scores are equal
 				if (arrTile[nextI][nextJ].getScore() == baseTile.getScore())
 					return true;
-			}	
+			}
 		return false;
 	}
 
@@ -180,7 +229,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 			for (int i = 0; i < tCells; i++)
 				go(i, j, dX, dY);
 
-		tMove = new TileMovement(scr, this, 0, -1, arrToMove);
+		tMove = new TileMovement(scr, this, dX, dY, arrToMove);
 		tMove.start();
 	}
 
@@ -190,7 +239,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 			for (int j = 0; j < tCells; j++)
 				go(i, j, dX, dY);
 
-		tMove = new TileMovement(scr, this, -1, 0, arrToMove);
+		tMove = new TileMovement(scr, this, dX, dY, arrToMove);
 		tMove.start();
 	}
 
@@ -199,7 +248,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 		for (int j = tCells-1; j >=0; j--)
 			for (int i = 0; i < tCells; i++) 
 				go(i, j, dX, dY);
-		tMove = new TileMovement(scr, this, 0, 1, arrToMove);
+		tMove = new TileMovement(scr, this, dX, dY, arrToMove);
 		tMove.start();
 	}
 
@@ -208,7 +257,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 		for (int i = tCells-1; i >=0; i--)
 			for (int j = 0; j < tCells; j++) 
 				go(i, j, dX, dY);
-		tMove = new TileMovement(scr, this, 1, 0, arrToMove);
+		tMove = new TileMovement(scr, this, dX, dY, arrToMove);
 		tMove.start();
 	}
 	
@@ -296,7 +345,6 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 	 * @param dY - defines side move direction (0, 1)
 	 */
 	private void doSnapshot(int dX, int dY) {
-		undoQuantity = undoQuantity > 0? undoQuantity-1:undoQuantity;
 		// game field
 		for (int i = 0; i < tCells; i++)
 			for (int j = 0; j < tCells; j++){
@@ -311,13 +359,14 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 		undoGameScore = gameScore;
 		
 		// movement side and NewTile generation point
-		if (undoDX == dX && undoDY == dY){	// if side move after Undo action is the same
-			undoSameSideMovement = true;
-			newTileI = undoNewTileI;
-			newTileJ = undoNewTileJ;
-		}
+		if (undoQuantity == 2)	// if Undo button just pressed
+			if (undoDX == dX && undoDY == dY){	// if side move after Undo action is the same
+				undoSameSideMovement = true;
+			}
 		undoDX = dX;
 		undoDY = dY;
+
+		undoQuantity = undoQuantity > 0? undoQuantity-1:undoQuantity;
 	}
 
 
@@ -338,11 +387,16 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 			scr.leftBtn.setEnabled(true);
 			scr.downBtn.setEnabled(true);
 			scr.rightBtn.setEnabled(true);
+			scr.surrendBtn.setEnabled(true);
 			scr.undoBtn.setEnabled(false);
+			scr.logBackUp.setEnabled(true);
 			
 			turnDone = true;
 			scr.mp.validate();
 			scr.mp.repaint();
+			logger.writeNewGame();
+			if (!gameThread.isAlive())
+				gameThread.start();
 		}
 		
 		/**
@@ -351,6 +405,7 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 		if (e.getSource().equals(scr.surrendBtn)){
 			int d = JOptionPane.showConfirmDialog(scr.fr, "Вы уверены, что хотите сдаться?", "Подтверждение сдачи", JOptionPane.YES_NO_OPTION);
 			if (d == JOptionPane.OK_OPTION){
+				logger.writeSurrend();
 				JOptionPane.showMessageDialog(scr.fr, "Вы сдались! Конец игры.");
 				hsw.addHighScoresToFile(gameScore);
 			}
@@ -375,6 +430,11 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 				}
 			scr.mp.validate();
 			scr.mp.repaint();
+			logger.writeUndoClicked();
+		}
+		
+		if (e.getSource().equals(scr.logBackUp)){
+			logger.doLogBackUp();
 		}
 		
 		if (e.getSource().equals(scr.upBtn)){
@@ -423,5 +483,14 @@ public class Logic implements Constants, KeyListener, KeyDictionary, ActionListe
 	public void setGameScore(int newScore) {
 		gameScore = newScore;
 		scr.scoreLbl.setText(Integer.toString(gameScore));
+	}
+
+	public void doOnClose() {
+		try {
+			logger.out.close();
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		System.exit(0);
 	}
 }

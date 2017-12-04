@@ -1,5 +1,6 @@
 package Mech;
 
+import java.awt.event.KeyEvent;
 
 public interface KeyDictionary {
 	
@@ -11,6 +12,7 @@ public interface KeyDictionary {
 			case 'W':
 			case 'ц':
 			case 'Ц':
+			case KeyEvent.VK_UP:
 				cc = 'w';
 				break;
 	
@@ -18,6 +20,7 @@ public interface KeyDictionary {
 			case 'A':
 			case 'ф':
 			case 'Ф':
+			case KeyEvent.VK_LEFT:
 				cc = 'a';
 				break;
 				
@@ -25,6 +28,7 @@ public interface KeyDictionary {
 			case 'S':
 			case 'ы':
 			case 'Ы':
+			case KeyEvent.VK_DOWN:
 				cc = 's';
 				break;
 				
@@ -32,6 +36,7 @@ public interface KeyDictionary {
 			case 'D':
 			case 'в':
 			case 'В':
+			case KeyEvent.VK_RIGHT:
 				cc = 'd';
 				break;
 			}

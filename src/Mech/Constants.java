@@ -3,6 +3,7 @@ package Mech;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Point;
+import java.io.File;
 
 public interface Constants {
 	public int tSize = 100;
@@ -18,4 +19,6 @@ public interface Constants {
 	public int wasdDXY = tSize/2+tGap;
 	public int wasdSize = tSize/2;
 	public Color lightRed = new Color(255, 200, 200);
+	public File companyFolder = new File(System.getenv("APPDATA")+"/PlemCo");
+	public File gameFolder = new File(System.getenv("APPDATA")+"/PlemCo/2048");
 }
